@@ -71,13 +71,19 @@ theme_config = config["THEME"]
 theme_settings = open(PATH + theme_config).read()
 theme = json.loads(theme_settings)
 
-SERVER = config['WEATHERBIT_URL']
 HEADERS = {}
-WEATHERBIT_COUNTRY = config['WEATHERBIT_COUNTRY']
-WEATHERBIT_LANG = config['WEATHERBIT_LANGUAGE']
-WEATHERBIT_POSTALCODE = config['WEATHERBIT_POSTALCODE']
-WEATHERBIT_HOURS = config['WEATHERBIT_HOURS']
-WEATHERBIT_DAYS = config['WEATHERBIT_DAYS']
+WEATHER_SOURCE = config.get('WEATHER_SOURCE', 'WEATHERBIT')
+if WEATHER_SOURCE == 'WEATHERBIT':
+    SERVER = config['WEATHERBIT_URL']
+    WEATHERBIT_COUNTRY = config['WEATHERBIT_COUNTRY']
+    WEATHERBIT_LANG = config['WEATHERBIT_LANGUAGE']
+    WEATHERBIT_POSTALCODE = config['WEATHERBIT_POSTALCODE']
+    WEATHERBIT_HOURS = config['WEATHERBIT_HOURS']
+    WEATHERBIT_DAYS = config['WEATHERBIT_DAYS']
+else:
+    msg = f'WEATHER_SOURCE {WEATHER_SOURCE} is not defined in config.json'
+    raise NotImplementedError(msg)
+
 METRIC = config['LOCALE']['METRIC']
 
 locale.setlocale(locale.LC_ALL, (config['LOCALE']['ISO'], 'UTF-8'))
@@ -452,6 +458,19 @@ class Update:
         THREADS.append(thread)
 
         CONNECTION = pygame.time.get_ticks() + 1500  # 1.5 seconds
+
+        if WEATHER_SOURCE == 'WEATHERBIT':
+            Update._get_weatherbit()
+        else:
+            msg = f'No update_json() implementation for WEATHER_SOURCE {WEATHER_SOURCE}'
+            raise NotImplementedError(msg)
+
+    @staticmethod
+    def _get_weatherbit():
+        """
+        Get data from weatherbit.io and write to the latest_weather.json file
+        """
+        global CONNECTION_ERROR
 
         try:
 
