@@ -80,6 +80,12 @@ if WEATHER_SOURCE == 'WEATHERBIT':
     WEATHERBIT_POSTALCODE = config['WEATHERBIT_POSTALCODE']
     WEATHERBIT_HOURS = config['WEATHERBIT_HOURS']
     WEATHERBIT_DAYS = config['WEATHERBIT_DAYS']
+elif WEATHER_SOURCE == 'METOFFICEDATAHUB':
+    SERVER = config['METOFFICEDATAHUB_URL']
+    METOFFICEDATAHUB_CLIENT_ID = config['METOFFICEDATAHUB_CLIENT_ID']
+    METOFFICEDATAHUB_CLIENT_SECRET = config['METOFFICEDATAHUB_CLIENT_SECRET']
+    METOFFICEDATAHUB_LAT = config['METOFFICEDATAHUB_LAT']
+    METOFFICEDATAHUB_LON = config['METOFFICEDATAHUB_LON']
 else:
     msg = f'WEATHER_SOURCE {WEATHER_SOURCE} is not defined in config.json'
     raise NotImplementedError(msg)
@@ -459,43 +465,14 @@ class Update:
 
         CONNECTION = pygame.time.get_ticks() + 1500  # 1.5 seconds
 
-        if WEATHER_SOURCE == 'WEATHERBIT':
-            Update._get_weatherbit()
-        else:
-            msg = f'No update_json() implementation for WEATHER_SOURCE {WEATHER_SOURCE}'
-            raise NotImplementedError(msg)
-
-    @staticmethod
-    def _get_weatherbit():
-        """
-        Get data from weatherbit.io and write to the latest_weather.json file
-        """
-        global CONNECTION_ERROR
-
         try:
-
-            current_endpoint = f'{SERVER}/current'
-            daily_endpoint = f'{SERVER}/forecast/daily'
-            stats_endpoint = f'{SERVER}/subscription/usage'
-            units = 'M' if METRIC else 'I'
-
-            logger.info(f'connecting to server: {SERVER}')
-
-            options = str(f'&postal_code={WEATHERBIT_POSTALCODE}&country={WEATHERBIT_COUNTRY}&lang={WEATHERBIT_LANG}&units={units}')
-
-            current_request_url = str(f'{current_endpoint}?key={WEATHERBIT_IO_KEY}{options}')
-            daily_request_url = str(f'{daily_endpoint}?key={WEATHERBIT_IO_KEY}{options}&days={WEATHERBIT_DAYS}')
-            stats_request_url = str(f'{stats_endpoint}?key={WEATHERBIT_IO_KEY}')
-
-            current_data = requests.get(current_request_url, headers=HEADERS).json()
-            daily_data = requests.get(daily_request_url, headers=HEADERS).json()
-            stats_data = requests.get(stats_request_url, headers=HEADERS).json()
-
-            data = {
-                'current': current_data,
-                'daily': daily_data,
-                'stats': stats_data
-            }
+            if WEATHER_SOURCE == 'WEATHERBIT':
+                data = Update._get_weatherbit()
+            elif WEATHER_SOURCE == 'METOFFICEDATAHUB':
+                data = Update._get_metofficedatahub()
+            else:
+                msg = f'No update_json() implementation for WEATHER_SOURCE {WEATHER_SOURCE}'
+                raise NotImplementedError(msg)
 
             with open(LOG_PATH + 'latest_weather.json', 'w+') as outputfile:
                 json.dump(data, outputfile, indent=2, sort_keys=True)
@@ -509,6 +486,78 @@ class Update:
             CONNECTION_ERROR = True
 
             logger.warning(f'Connection ERROR: {update_ex}')
+
+
+    @staticmethod
+    def _get_weatherbit():
+        """
+        Get data from weatherbit.io
+        """
+        current_endpoint = f'{SERVER}/current'
+        daily_endpoint = f'{SERVER}/forecast/daily'
+        stats_endpoint = f'{SERVER}/subscription/usage'
+        units = 'M' if METRIC else 'I'
+
+        logger.info(f'connecting to server: {SERVER}')
+
+        options = str(f'&postal_code={WEATHERBIT_POSTALCODE}&country={WEATHERBIT_COUNTRY}&lang={WEATHERBIT_LANG}&units={units}')
+
+        current_request_url = str(f'{current_endpoint}?key={WEATHERBIT_IO_KEY}{options}')
+        daily_request_url = str(f'{daily_endpoint}?key={WEATHERBIT_IO_KEY}{options}&days={WEATHERBIT_DAYS}')
+        stats_request_url = str(f'{stats_endpoint}?key={WEATHERBIT_IO_KEY}')
+
+        current_data = requests.get(current_request_url, headers=HEADERS).json()
+        daily_data = requests.get(daily_request_url, headers=HEADERS).json()
+        stats_data = requests.get(stats_request_url, headers=HEADERS).json()
+
+        data = {
+            'current': current_data,
+            'daily': daily_data,
+            'stats': stats_data
+        }
+
+        return data
+
+    @staticmethod
+    def _get_metofficedatahub():
+        """
+        Get data from Met Office Data Hub (https://www.metoffice.gov.uk/services/data)
+        and convert to weatherbit.io format
+        """
+        # current_endpoint = f'{SERVER}/current'
+        daily_endpoint = f'{SERVER}/forecasts/point/daily'
+        # stats_endpoint = f'{SERVER}/subscription/usage'
+        # units = 'M' if METRIC else 'I'
+
+        HEADERS['x-ibm-client-id'] = METOFFICEDATAHUB_CLIENT_ID
+        HEADERS['x-ibm-client-secret'] = METOFFICEDATAHUB_CLIENT_SECRET
+        HEADERS['accept'] = "application/json"
+
+        logger.info(f'connecting to server: {SERVER}')
+
+        # current_request_url = str(f'{current_endpoint}?key={WEATHERBIT_IO_KEY}{options}')
+        daily_payload = {
+            'excludeParameterMetadata': 'true',
+            'includeLocationName': 'true',
+            'latitude': METOFFICEDATAHUB_LAT,
+            'longitude': METOFFICEDATAHUB_LON
+        }
+        # stats_request_url = str(f'{stats_endpoint}?key={WEATHERBIT_IO_KEY}')
+
+        # current_data = requests.get(current_request_url, headers=HEADERS).json()
+        daily_response = requests.get(daily_endpoint, params=daily_payload,
+                                  headers=HEADERS)
+        logger.info(f'Met Office response code {daily_response.status_code}')
+        daily_data = daily_response.json()
+        # stats_data = requests.get(stats_request_url, headers=HEADERS).json()
+
+        data = {
+            # 'current': current_data,
+            'daily': daily_data,
+            # 'stats': stats_data
+        }
+
+        return data
 
     @staticmethod
     def read_json():
