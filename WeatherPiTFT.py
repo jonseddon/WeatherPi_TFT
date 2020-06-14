@@ -491,7 +491,7 @@ class Update:
     @staticmethod
     def _get_weatherbit():
         """
-        Get data from weatherbit.io
+        Get data from weatherbit.io.
         """
         current_endpoint = f'{SERVER}/current'
         daily_endpoint = f'{SERVER}/forecast/daily'
@@ -522,7 +522,11 @@ class Update:
     def _get_metofficedatahub():
         """
         Get data from Met Office Data Hub (https://www.metoffice.gov.uk/services/data)
-        and convert to weatherbit.io format
+        and convert to weatherbit.io format.
+
+        :returns: the Met Office DataHub data in the same format as the
+            weatherbit data
+        :rtype: dict
         """
         # current_endpoint = f'{SERVER}/current'
         daily_endpoint = f'{SERVER}/forecasts/point/daily'
@@ -535,9 +539,11 @@ class Update:
 
         logger.info(f'connecting to server: {SERVER}')
 
+        # TODO handle metric/imperial conversion
+
         # current_request_url = str(f'{current_endpoint}?key={WEATHERBIT_IO_KEY}{options}')
         daily_payload = {
-            'excludeParameterMetadata': 'true',
+            'excludeParameterMetadata': 'false',
             'includeLocationName': 'true',
             'latitude': METOFFICEDATAHUB_LAT,
             'longitude': METOFFICEDATAHUB_LON
@@ -553,11 +559,47 @@ class Update:
 
         data = {
             # 'current': current_data,
-            'daily': daily_data,
+            'daily': Update._metofficedatahub_daily_to_weatherbit(daily_data),
             # 'stats': stats_data
         }
 
         return data
+
+    @staticmethod
+    def _metofficedatahub_daily_to_weatherbit(daily_dict):
+        """
+        Convert the dict loaded from the Met Office DataHub daily data into
+        the equivalent from weatherbit.io.
+
+        :param dict daily_dict: the data converted from the JSON returned
+            by daily forecast data from the Met Office DataHub
+        :returns: the daily data converted to the weatherbit.io format
+        :rtype: dict
+        """
+        output_dict = {}
+        location_name = daily_dict['features']['properties']['location']['name']
+        output_dict['city_name'] = location_name.split(',')[0]
+        output_dict['country_code'] = location_name.split(',')[-1]
+        mo_time_series = daily_dict['features']['properties']['timeSeries']
+        output_dict['data'] = [
+            Update._metofficedatahub_daily_ts_to_weatherbit(day)
+            for day in mo_time_series
+        ]
+
+        return output_dict
+
+    @staticmethod
+    def _metofficedatahub_daily_ts_to_weatherbit(ts_dict):
+        """
+        Convert the dicts in the `timeSeries` list in the Met Office DataHub
+        daily data into the equivalent from weatherbit.io.
+
+        :param dict ts_dict: the data in the timeSeries elements from the JSON
+            returned by daily forecast data from the Met Office DataHub
+        :returns: the timeSeries data converted to the weatherbit.io data format
+        :rtype: dict
+        """
+        # TODO implement me here
 
     @staticmethod
     def read_json():
