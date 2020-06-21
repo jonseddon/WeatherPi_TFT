@@ -599,7 +599,43 @@ class Update:
         :returns: the timeSeries data converted to the weatherbit.io data format
         :rtype: dict
         """
-        # TODO implement me here
+        daily_dict = {}
+        daily_dict['app_max_temp'] = ts_dict['dayMaxFeelsLikeTemp']
+        daily_dict['app_min_temp'] = ts_dict['nightMinFeelsLikeTemp']
+        daily_dict['clouds'] = None
+        daily_dict['clouds_hi'] = None
+        daily_dict['clouds_low'] = None
+        daily_dict['clouds_mid'] = None
+        daily_dict['datetime'] = datetime.datetime.strptime(
+            ts_dict['time'],
+            '%Y-%m-%dT%H:%MZ'
+        ).strftime('%Y-%m-%d')
+        daily_dict['dewpt'] = None
+        daily_dict['high_temp'] = ts_dict['dayMaxScreenTemperature']
+        daily_dict['low_temp'] = ts_dict['nightMinScreenTemperature']
+        daily_dict['max_dhi'] = None
+        daily_dict['max_temp'] = ts_dict['dayMaxScreenTemperature']
+        daily_dict['min_temp'] = ts_dict['nightMinScreenTemperature']
+        daily_dict['moon_phase'] = None # TODO
+        daily_dict['moon_phase_lunation'] = None # TODO
+        daily_dict['moonrise_ts'] = None # TODO
+        daily_dict['moonset_ts'] = None # TODO
+        daily_dict['ozone'] = None
+        daily_dict['pop'] = ts_dict['dayProbabilityOfPrecipitation']
+        daily_dict['precip'] = None
+        daily_dict['pres'] = ts_dict['middayMslp'] / 100
+        daily_dict['rh'] = ts_dict['middayRelativeHumidity']
+        daily_dict['slp'] = ts_dict['middayMslp'] / 100  # TODO calculate properly
+        daily_dict[''] = ts_dict['']
+        daily_dict[''] = ts_dict['']
+        daily_dict[''] = ts_dict['']
+        daily_dict[''] = ts_dict['']
+        daily_dict[''] = ts_dict['']
+        daily_dict[''] = ts_dict['']
+        daily_dict[''] = ts_dict['']
+        daily_dict[''] = ts_dict['']
+
+        return daily_dict
 
     @staticmethod
     def read_json():
@@ -1064,6 +1100,39 @@ def loop():
         clock.tick(FPS)
 
     quit_all()
+
+
+def _to_station_pressure(mslp, alt, tmpt):
+    """
+    Convert mean sea level pressure to station pressure.
+    From https://en.wikipedia.org/wiki/Barometric_formula
+
+    >>> _to_station_pressure(1013.37, 130, 16.1)
+    997.92956995144
+
+    :param float mslp: mean sea level pressure in hPa
+    :param float alt: the station altitude in metre
+    :param float tmpt: the station temperature in degrees Celsius
+    :returns: the station pressure in hPa
+    :rtype: float
+    """
+    abs_zero = -273.15  # absolute zero in degree Celsius
+    tmpt_k = tmpt - abs_zero
+    hpa_to_pa = 100  # factor to multiply pressure in hPa to get Pa
+    mslp_pa = mslp * hpa_to_pa
+    m = 0.0289644  # molar mass of Earth's air in kg mol^-1
+    g = 9.80665  # gravitational acceleration in m s^-2
+    r_star = 8.3144598  # universal gas constant J (mol K)^-1
+
+    pres = (
+        mslp_pa * math.exp(
+            -1 * (m * g * alt) / (tmpt_k * r_star)
+        )
+    )
+
+    pres_hpa = pres / hpa_to_pa
+
+    return pres_hpa
 
 
 if __name__ == '__main__':
